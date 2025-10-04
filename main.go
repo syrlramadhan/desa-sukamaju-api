@@ -36,6 +36,9 @@ func main() {
 	adminController := controllers.NewAdminController(adminService)
 
 	router.POST("/api/v1/admin/login", adminController.LoginAdmin)
+	router.PUT("/api/v1/admin/:username/username", adminController.UpdateUsernameAdmin)
+	router.PUT("/api/v1/admin/:username/password", adminController.UpdatePasswordAdmin)
+	router.GET("/api/v1/admin/:id_admin", adminController.GetAdminById)
 
 	handler := CorsMiddleware(router)
 

@@ -9,11 +9,12 @@ import (
 )
 
 type Claims struct {
+	Id       string `json:"id"`
 	Username string `json:"username"`
 	jwt.StandardClaims
 }
 
-func GenerateJWT(username string) (string, error) {
+func GenerateJWT(id, username string) (string, error) {
 	err := godotenv.Load()
 	if err != nil {
 		panic(err)
@@ -23,6 +24,7 @@ func GenerateJWT(username string) (string, error) {
 	expirationTime := time.Now().Add(5 * time.Hour)
 
 	claims := &Claims{
+		Id:       id,
 		Username: username,
 		StandardClaims: jwt.StandardClaims{
 			ExpiresAt: expirationTime.Unix(),

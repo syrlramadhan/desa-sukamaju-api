@@ -22,6 +22,20 @@ func WriteJSONSuccess(w http.ResponseWriter, data interface{}, message string) {
 	json.NewEncoder(w).Encode(response)
 }
 
+// WriteJSONNoData digunakan untuk mengirim response sukses dalam format JSON
+func WriteJSONNoData(w http.ResponseWriter, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	response := dto.ListResponseNoData{
+		Code:    http.StatusOK,
+		Status:  http.StatusText(http.StatusOK),
+		Message: message,
+	}
+
+	json.NewEncoder(w).Encode(response)
+}
+
 // WriteJSONLogin digunakan untuk mengirim response sukses dalam format JSON
 func WriteJSONLogin(w http.ResponseWriter, token string, message string) {
 	w.Header().Set("Content-Type", "application/json")
