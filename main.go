@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 
 	"github.com/joho/godotenv"
 	"github.com/julienschmidt/httprouter"
@@ -40,6 +41,15 @@ func main() {
 	router.PUT("/api/v1/admin/:username/password", adminController.UpdatePasswordAdmin)
 	router.GET("/api/v1/admin/:id_admin", adminController.GetAdminById)
 
+	kontenRepo := repositories.NewKontenRepository()
+	kontenService := services.NewKontenService(kontenRepo, db)
+	kontenController := controllers.NewKontenController(kontenService)
+
+	router.GET("/api/v1/kontak/:id_kontak", kontenController.GetKontak)
+	router.PUT("/api/v1/kontak/:id_kontak", kontenController.UpdateKontak)
+
+	router.GET("/uploads/:filename", serveUploadedFile)
+
 	handler := CorsMiddleware(router)
 
 	server := http.Server{
@@ -52,6 +62,26 @@ func main() {
 		fmt.Printf("error saat memulai server: %v\n", errServer)
 		return
 	}
+}
+
+func serveUploadedFile(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	filename := ps.ByName("filename")
+	if filename == "" {
+		http.Error(w, "Filename is required", http.StatusBadRequest)
+		return
+	}
+
+	// Construct the file path
+	filePath := filepath.Join("uploads", filename)
+
+	// Check if file exists
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		http.Error(w, "File not found", http.StatusNotFound)
+		return
+	}
+
+	// Serve the file
+	http.ServeFile(w, r, filePath)
 }
 
 func CorsMiddleware(next http.Handler) http.Handler {
