@@ -48,6 +48,13 @@ func main() {
 	router.GET("/api/v1/kontak/:id_kontak", kontenController.GetKontak)
 	router.PUT("/api/v1/kontak/:id_kontak", kontenController.UpdateKontak)
 
+	aparatRepo := repositories.NewAparatRepository()
+	aparatService := services.NewAparatService(aparatRepo, db)
+	aparatController := controllers.NewAparatController(aparatService)
+
+	router.POST("/api/v1/aparat", aparatController.CreateAparat)
+	router.GET("/api/v1/aparat", aparatController.GetAllAparat)
+
 	router.GET("/uploads/:filename", serveUploadedFile)
 
 	handler := CorsMiddleware(router)

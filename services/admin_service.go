@@ -7,7 +7,7 @@ import (
 	"net/http"
 
 	"github.com/syrlramadhan/desa-sukamaju-api/dto"
-	helper "github.com/syrlramadhan/desa-sukamaju-api/helpers"
+	"github.com/syrlramadhan/desa-sukamaju-api/helpers"
 	"github.com/syrlramadhan/desa-sukamaju-api/repositories"
 )
 
@@ -75,11 +75,11 @@ func (a *AdminServiceImpl) LoginAdmin(ctx context.Context, loginReq dto.LoginReq
 		return "", http.StatusInternalServerError, fmt.Errorf("gagal mendapatkan admin: %v", err)
 	}
 
-	if !helper.VerifyPassword(admin.Password, loginReq.Password) {
+	if !helpers.VerifyPassword(admin.Password, loginReq.Password) {
 		return "", http.StatusBadRequest, fmt.Errorf("username atau password salah")
 	}
 
-	token, err := helper.GenerateJWT(admin.IdAdmin, admin.Username)
+	token, err := helpers.GenerateJWT(admin.IdAdmin, admin.Username)
 	if err != nil {
 		return "", http.StatusBadRequest, fmt.Errorf("gagal menghasilkan token: %v", err)
 	}
@@ -108,7 +108,7 @@ func (a *AdminServiceImpl) UpdatePasswordAdmin(ctx context.Context, username str
 		return http.StatusBadRequest, fmt.Errorf("password lama tidak boleh kosong")
 	}
 
-	if !helper.VerifyPassword(admin.Password, passReq.OldPassword) {
+	if !helpers.VerifyPassword(admin.Password, passReq.OldPassword) {
 		return http.StatusBadRequest, fmt.Errorf("password lama salah")
 	}
 
@@ -124,7 +124,7 @@ func (a *AdminServiceImpl) UpdatePasswordAdmin(ctx context.Context, username str
 		return http.StatusBadRequest, fmt.Errorf("password dan konfirmasi password tidak cocok")
 	}
 
-	hashedPassword, err := helper.HashPassword(passReq.Password)
+	hashedPassword, err := helpers.HashPassword(passReq.Password)
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("gagal hash password: %v", err)
 	}

@@ -1,13 +1,13 @@
 package models
 
 type Aparat struct {
-	IdAparat       string `json:"id_aparat"`
-	Nama           string `json:"nama"`
-	Jabatan        string `json:"jabatan"`
-	NoTelepon      string `json:"no_telepon"`
-	Email          string `json:"email"`
-	Status         string `json:"status"`
-	PeriodeMulai   string `json:"periode_mulai"`
-	PeriodeSelesai string `json:"periode_selesai"`
-	Foto           string `json:"foto"`
+	IdAparat       string
+	Nama           string
+	Jabatan        string
+	NoTelepon      string
+	Email          string
+	Status         string
+	PeriodeMulai   string
+	PeriodeSelesai string
+	Foto           string
 }
