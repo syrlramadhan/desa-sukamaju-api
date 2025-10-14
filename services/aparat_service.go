@@ -201,9 +201,8 @@ func (a *aparatServiceImpl) UpdateAparat(ctx context.Context, r *http.Request, i
 		return dto.AparatResponse{}, http.StatusNotFound, fmt.Errorf("aparat dengan id %s tidak ditemukan", idAparat)
 	}
 
-	err = os.Remove(filepath.Join("uploads", getAparat.Foto))
-	if err != nil {
-		return dto.AparatResponse{}, http.StatusInternalServerError, fmt.Errorf("gagal menghapus foto lama: %v", err)
+	if _, err := os.Stat(uploadDir); os.IsExist(err) {
+		os.Remove(filepath.Join(uploadDir, getAparat.Foto))
 	}
 
 	aparatModel := models.Aparat{
@@ -252,9 +251,9 @@ func (a *aparatServiceImpl) DeleteAparat(ctx context.Context, idAparat string) (
 		return http.StatusInternalServerError, fmt.Errorf("gagal menghapus aparat: %v", err)
 	}
 
-	err = os.Remove(filepath.Join("uploads", getAparat.Foto))
-	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("gagal menghapus foto: %v", err)
+	uploadDir := "./uploads/"
+	if _, err := os.Stat(uploadDir); os.IsExist(err) {
+		os.Remove(filepath.Join(uploadDir, getAparat.Foto))
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -293,9 +292,9 @@ func (a *aparatServiceImpl) BulkDeleteAparat(ctx context.Context, idAparat []str
 	}
 
 	for _, aparat := range aparat {
-		err = os.Remove(filepath.Join("uploads", aparat.Foto))
-		if err != nil {
-			return http.StatusInternalServerError, fmt.Errorf("gagal menghapus foto: %v", err)
+		uploadDir := "./uploads/"
+		if _, err := os.Stat(uploadDir); os.IsExist(err) {
+			os.Remove(filepath.Join(uploadDir, aparat.Foto))
 		}
 	}
 
