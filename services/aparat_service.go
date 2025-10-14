@@ -18,10 +18,11 @@ import (
 
 type AparatService interface {
 	CreateAparat(ctx context.Context, r *http.Request, aparatReq dto.AparatRequest) (dto.AparatResponse, int, error)
-	UpdateAparat(ctx context.Context, idAparat string, aparatReq dto.AparatRequest) (dto.AparatResponse, int, error)
+	UpdateAparat(ctx context.Context, r *http.Request, idAparat string, aparatReq dto.AparatRequest) (dto.AparatResponse, int, error)
 	GetAllAparat(ctx context.Context) ([]dto.AparatResponse, int, error)
 	GetAparatById(ctx context.Context, idAparat string) (dto.AparatResponse, int, error)
 	DeleteAparat(ctx context.Context, idAparat string) (int, error)
+	BulkDeleteAparat(ctx context.Context, idAparat []string) (int, error)
 }
 
 type aparatServiceImpl struct {
@@ -56,7 +57,9 @@ func (a *aparatServiceImpl) CreateAparat(ctx context.Context, r *http.Request, a
 	}
 	defer fotoFile.Close()
 
-	fotoFilename := fmt.Sprintf("aparat_%s_%s.jpg", aparatReq.Nama, uuid.New().String())
+	uuid := uuid.New().String()
+
+	fotoFilename := fmt.Sprintf("aparat_%s_%s.jpg", aparatReq.Nama, uuid)
 
 	uploadDir := "./uploads/"
 	if _, err := os.Stat(uploadDir); os.IsNotExist(err) {
@@ -84,7 +87,7 @@ func (a *aparatServiceImpl) CreateAparat(ctx context.Context, r *http.Request, a
 	defer tx.Rollback()
 
 	aparatModel := models.Aparat{
-		IdAparat:       uuid.New().String(),
+		IdAparat:       uuid,
 		Nama:           aparatReq.Nama,
 		Jabatan:        aparatReq.Jabatan,
 		NoTelepon:      aparatReq.NoTelepon,
@@ -99,7 +102,7 @@ func (a *aparatServiceImpl) CreateAparat(ctx context.Context, r *http.Request, a
 	if err != nil {
 		return dto.AparatResponse{}, http.StatusInternalServerError, fmt.Errorf("gagal menambahkan aparat: %v", err)
 	}
-	
+
 	if err := tx.Commit(); err != nil {
 		return dto.AparatResponse{}, http.StatusInternalServerError, fmt.Errorf("gagal mengkomit transaksi: %v", err)
 	}
@@ -119,7 +122,7 @@ func (a *aparatServiceImpl) GetAllAparat(ctx context.Context) ([]dto.AparatRespo
 	if err != nil {
 		return nil, http.StatusInternalServerError, fmt.Errorf("gagal mendapatkan data aparat: %v", err)
 	}
-	
+
 	if err := tx.Commit(); err != nil {
 		return nil, http.StatusInternalServerError, fmt.Errorf("gagal mengkomit transaksi: %v", err)
 	}
@@ -129,15 +132,176 @@ func (a *aparatServiceImpl) GetAllAparat(ctx context.Context) ([]dto.AparatRespo
 
 // GetAparatById implements AparatService.
 func (a *aparatServiceImpl) GetAparatById(ctx context.Context, idAparat string) (dto.AparatResponse, int, error) {
-	panic("unimplemented")
+	tx, err := a.DB.Begin()
+	if err != nil {
+		return dto.AparatResponse{}, http.StatusInternalServerError, fmt.Errorf("gagal memulai transaksi: %v", err)
+	}
+	defer tx.Rollback()
+
+	aparat, err := a.AparatRepository.GetAparatById(ctx, tx, idAparat)
+	if err != nil {
+		return dto.AparatResponse{}, http.StatusInternalServerError, fmt.Errorf("gagal mendapatkan aparat: %v", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return dto.AparatResponse{}, http.StatusInternalServerError, fmt.Errorf("gagal mengkomit transaksi: %v", err)
+	}
+
+	return helpers.ConvertAparatToResponseDTO(aparat), http.StatusOK, nil
 }
 
 // UpdateAparat implements AparatService.
-func (a *aparatServiceImpl) UpdateAparat(ctx context.Context, idAparat string, aparatReq dto.AparatRequest) (dto.AparatResponse, int, error) {
-	panic("unimplemented")
+func (a *aparatServiceImpl) UpdateAparat(ctx context.Context, r *http.Request, idAparat string, aparatReq dto.AparatRequest) (dto.AparatResponse, int, error) {
+	aparatReq.Nama = r.FormValue("nama")
+	aparatReq.Jabatan = r.FormValue("jabatan")
+	aparatReq.NoTelepon = r.FormValue("no_telepon")
+	aparatReq.Email = r.FormValue("email")
+	aparatReq.Status = r.FormValue("status")
+	aparatReq.PeriodeMulai = r.FormValue("periode_mulai")
+	aparatReq.PeriodeSelesai = r.FormValue("periode_selesai")
+	fotoFile, _, err := r.FormFile("foto")
+	if err != nil {
+		return dto.AparatResponse{}, http.StatusInternalServerError, fmt.Errorf("failed to get foto from form: %v", err)
+	}
+	defer fotoFile.Close()
+
+	fotoFilename := fmt.Sprintf("aparat_%s_%s.jpg", aparatReq.Nama, idAparat)
+
+	uploadDir := "./uploads/"
+	if _, err := os.Stat(uploadDir); os.IsNotExist(err) {
+		os.Mkdir(uploadDir, os.ModePerm)
+	}
+
+	filePath := filepath.Join(uploadDir, fotoFilename)
+	out, err := os.Create(filePath)
+	if err != nil {
+		return dto.AparatResponse{}, http.StatusInternalServerError, fmt.Errorf("failed to create file: %v", err)
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, fotoFile)
+	if err != nil {
+		return dto.AparatResponse{}, http.StatusInternalServerError, fmt.Errorf("failed to copy file: %v", err)
+	}
+
+	aparatReq.Foto = fotoFilename
+
+	tx, err := a.DB.Begin()
+	if err != nil {
+		return dto.AparatResponse{}, http.StatusInternalServerError, fmt.Errorf("gagal memulai transaksi: %v", err)
+	}
+	defer tx.Rollback()
+
+	getAparat, err := a.AparatRepository.GetAparatById(ctx, tx, idAparat)
+	if err != nil {
+		return dto.AparatResponse{}, http.StatusInternalServerError, fmt.Errorf("gagal mendapatkan aparat: %v", err)
+	}
+
+	if getAparat.IdAparat == "" {
+		return dto.AparatResponse{}, http.StatusNotFound, fmt.Errorf("aparat dengan id %s tidak ditemukan", idAparat)
+	}
+
+	err = os.Remove(filepath.Join("uploads", getAparat.Foto))
+	if err != nil {
+		return dto.AparatResponse{}, http.StatusInternalServerError, fmt.Errorf("gagal menghapus foto lama: %v", err)
+	}
+
+	aparatModel := models.Aparat{
+		IdAparat:       idAparat,
+		Nama:           aparatReq.Nama,
+		Jabatan:        aparatReq.Jabatan,
+		NoTelepon:      aparatReq.NoTelepon,
+		Email:          aparatReq.Email,
+		Status:         aparatReq.Status,
+		PeriodeMulai:   aparatReq.PeriodeMulai,
+		PeriodeSelesai: aparatReq.PeriodeSelesai,
+		Foto:           aparatReq.Foto,
+	}
+
+	err = a.AparatRepository.UpdateAparat(ctx, tx, aparatModel)
+	if err != nil {
+		return dto.AparatResponse{}, http.StatusInternalServerError, fmt.Errorf("gagal mengupdate aparat: %v", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return dto.AparatResponse{}, http.StatusInternalServerError, fmt.Errorf("gagal mengkomit transaksi: %v", err)
+	}
+
+	return helpers.ConvertAparatToResponseDTO(aparatModel), http.StatusOK, nil
 }
 
 // DeleteAparat implements AparatService.
 func (a *aparatServiceImpl) DeleteAparat(ctx context.Context, idAparat string) (int, error) {
-	panic("unimplemented")
+	tx, err := a.DB.Begin()
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("gagal memulai transaksi: %v", err)
+	}
+	defer tx.Rollback()
+
+	getAparat, err := a.AparatRepository.GetAparatById(ctx, tx, idAparat)
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("gagal mendapatkan aparat: %v", err)
+	}
+
+	if getAparat.IdAparat == "" {
+		return http.StatusNotFound, fmt.Errorf("aparat dengan id %s tidak ditemukan", idAparat)
+	}
+
+	err = a.AparatRepository.DeleteAparat(ctx, tx, idAparat)
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("gagal menghapus aparat: %v", err)
+	}
+
+	err = os.Remove(filepath.Join("uploads", getAparat.Foto))
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("gagal menghapus foto: %v", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("gagal mengkomit transaksi: %v", err)
+	}
+
+	return http.StatusOK, nil
+}
+
+// BulkDeleteAparat implements AparatService.
+func (a *aparatServiceImpl) BulkDeleteAparat(ctx context.Context, idAparat []string) (int, error) {
+	tx, err := a.DB.Begin()
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("gagal memulai transaksi: %v", err)
+	}
+	defer tx.Rollback()
+
+	var aparat []models.Aparat
+
+	for _, id := range idAparat {
+		getAparat, err := a.AparatRepository.GetAparatById(ctx, tx, id)
+		if err != nil {
+			return http.StatusInternalServerError, fmt.Errorf("gagal mendapatkan aparat: %v", err)
+		}
+
+		if getAparat.IdAparat == "" {
+			return http.StatusNotFound, fmt.Errorf("aparat dengan id %s tidak ditemukan", id)
+		}
+
+		aparat = append(aparat, getAparat)
+	}
+
+	err = a.AparatRepository.BulkDeleteAparat(ctx, tx, idAparat)
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("gagal menghapus aparat: %v", err)
+	}
+
+	for _, aparat := range aparat {
+		err = os.Remove(filepath.Join("uploads", aparat.Foto))
+		if err != nil {
+			return http.StatusInternalServerError, fmt.Errorf("gagal menghapus foto: %v", err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("gagal mengkomit transaksi: %v", err)
+	}
+
+	return http.StatusOK, nil
 }

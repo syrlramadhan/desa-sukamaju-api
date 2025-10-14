@@ -54,6 +54,10 @@ func main() {
 
 	router.POST("/api/v1/aparat", aparatController.CreateAparat)
 	router.GET("/api/v1/aparat", aparatController.GetAllAparat)
+	router.GET("/api/v1/aparat/:id_aparat", aparatController.GetAparatById)
+	router.PUT("/api/v1/aparat/:id_aparat", aparatController.UpdateAparat)
+	router.DELETE("/api/v1/aparat/:id_aparat", aparatController.DeleteAparat)
+	router.DELETE("/api/v1/bulk/aparat", aparatController.BulkDeleteAparat)
 
 	router.GET("/uploads/:filename", serveUploadedFile)
 

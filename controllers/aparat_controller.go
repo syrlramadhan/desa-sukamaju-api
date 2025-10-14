@@ -15,6 +15,7 @@ type AparatController interface {
 	GetAparatById(w http.ResponseWriter, r *http.Request, ps httprouter.Params)
 	UpdateAparat(w http.ResponseWriter, r *http.Request, ps httprouter.Params)
 	DeleteAparat(w http.ResponseWriter, r *http.Request, ps httprouter.Params)
+	BulkDeleteAparat(w http.ResponseWriter, r *http.Request, _ httprouter.Params)
 }
 
 type aparatControllerImpl struct {
@@ -42,7 +43,7 @@ func (a *aparatControllerImpl) CreateAparat(w http.ResponseWriter, r *http.Reque
 
 // GetAllAparat implements AparatController.
 func (a *aparatControllerImpl) GetAllAparat(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	aparatResponse , code, err := a.AparatService.GetAllAparat(r.Context())
+	aparatResponse, code, err := a.AparatService.GetAllAparat(r.Context())
 	if err != nil {
 		helpers.WriteJSONError(w, code, err.Error())
 		return
@@ -53,15 +54,49 @@ func (a *aparatControllerImpl) GetAllAparat(w http.ResponseWriter, r *http.Reque
 
 // GetAparatById implements AparatController.
 func (a *aparatControllerImpl) GetAparatById(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	panic("unimplemented")
+	aparatResponse, code, err := a.AparatService.GetAparatById(r.Context(), ps.ByName("id_aparat"))
+	if err != nil {
+		helpers.WriteJSONError(w, code, err.Error())
+		return
+	}
+
+	helpers.WriteJSONSuccess(w, aparatResponse, "berhasil mendapatkan data aparat")
 }
 
 // UpdateAparat implements AparatController.
 func (a *aparatControllerImpl) UpdateAparat(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	panic("unimplemented")
+	aparatReq := dto.AparatRequest{}
+
+	aparatResponse, code, err := a.AparatService.UpdateAparat(r.Context(), r, ps.ByName("id_aparat"), aparatReq)
+	if err != nil {
+		helpers.WriteJSONError(w, code, err.Error())
+		return
+	}
+
+	helpers.WriteJSONSuccess(w, aparatResponse, "berhasil memperbarui data aparat")
 }
 
 // DeleteAparat implements AparatController.
 func (a *aparatControllerImpl) DeleteAparat(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	panic("unimplemented")
+	code, err := a.AparatService.DeleteAparat(r.Context(), ps.ByName("id_aparat"))
+	if err != nil {
+		helpers.WriteJSONError(w, code, err.Error())
+		return
+	}
+
+	helpers.WriteJSONNoData(w, "berhasil menghapus data aparat")
+}
+
+// BulkDeleteAparat implements AparatController.
+func (a *aparatControllerImpl) BulkDeleteAparat(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	idAparat := dto.BulkDeleteAparatRequest{}
+	helpers.ReadFromRequestBody(r, &idAparat)
+
+	code, err := a.AparatService.BulkDeleteAparat(r.Context(), idAparat.IDAparat)
+	if err != nil {
+		helpers.WriteJSONError(w, code, err.Error())
+		return
+	}
+
+	helpers.WriteJSONNoData(w, "berhasil menghapus data aparat")
 }

@@ -10,3 +10,7 @@ type AparatRequest struct {
 	PeriodeSelesai string `json:"periode_selesai"`
 	Foto           string `json:"foto"`
 }
+
+type BulkDeleteAparatRequest struct {
+	IDAparat []string `json:"id_aparat"`
+}
