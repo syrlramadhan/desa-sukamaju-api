@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"path/filepath"
 
 	"github.com/joho/godotenv"
 	"github.com/julienschmidt/httprouter"
@@ -59,7 +58,17 @@ func main() {
 	router.DELETE("/api/v1/aparat/:id_aparat", aparatController.DeleteAparat)
 	router.DELETE("/api/v1/bulk/aparat", aparatController.BulkDeleteAparat)
 
-	router.GET("/uploads/:filename", serveUploadedFile)
+	beritaRepo := repositories.NewBeritaRepository()
+	beritaService := services.NewBeritaService(beritaRepo, db)
+	beritaController := controllers.NewBeritaController(beritaService)
+
+	router.POST("/api/v1/berita", beritaController.CreateBerita)
+	router.GET("/api/v1/berita", beritaController.GetAllBerita)
+	router.GET("/api/v1/berita/:id_berita", beritaController.GetBeritaById)
+	router.POST("/api/v1/berita/photo", beritaController.CreatePhoto)
+
+	// Serve static files from uploads directory
+	router.ServeFiles("/uploads/*filepath", http.Dir("uploads"))
 
 	handler := CorsMiddleware(router)
 
@@ -73,26 +82,6 @@ func main() {
 		fmt.Printf("error saat memulai server: %v\n", errServer)
 		return
 	}
-}
-
-func serveUploadedFile(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	filename := ps.ByName("filename")
-	if filename == "" {
-		http.Error(w, "Filename is required", http.StatusBadRequest)
-		return
-	}
-
-	// Construct the file path
-	filePath := filepath.Join("uploads", filename)
-
-	// Check if file exists
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		http.Error(w, "File not found", http.StatusNotFound)
-		return
-	}
-
-	// Serve the file
-	http.ServeFile(w, r, filePath)
 }
 
 func CorsMiddleware(next http.Handler) http.Handler {

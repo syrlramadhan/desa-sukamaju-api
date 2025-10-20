@@ -1,10 +1,9 @@
-package models
+package dto
 
-type Berita struct {
-	IdBerita           string   `json:"id_berita"`
+type BeritaRequest struct {
 	JudulBerita        string   `json:"judul_berita"`
 	Kategori           string   `json:"kategori"`
 	TanggalPelaksanaan string   `json:"tanggal_pelaksanaan"`
 	Deskripsi          string   `json:"deskripsi"`
-	GambarBerita       []Galeri `json:"gambar_berita"`
+	GambarBerita       []string `json:"gambar_berita"`
 }
