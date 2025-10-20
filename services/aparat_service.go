@@ -61,7 +61,7 @@ func (a *aparatServiceImpl) CreateAparat(ctx context.Context, r *http.Request, a
 
 	fotoFilename := fmt.Sprintf("aparat_%s_%s.jpg", aparatReq.Nama, uuid)
 
-	uploadDir := "./uploads/"
+	uploadDir := "uploads/aparat/"
 	if _, err := os.Stat(uploadDir); os.IsNotExist(err) {
 		os.Mkdir(uploadDir, os.ModePerm)
 	}
@@ -167,7 +167,7 @@ func (a *aparatServiceImpl) UpdateAparat(ctx context.Context, r *http.Request, i
 
 	fotoFilename := fmt.Sprintf("aparat_%s_%s.jpg", aparatReq.Nama, idAparat)
 
-	uploadDir := "./uploads/"
+	uploadDir := "uploads/aparat/"
 	if _, err := os.Stat(uploadDir); os.IsNotExist(err) {
 		os.Mkdir(uploadDir, os.ModePerm)
 	}
@@ -251,7 +251,7 @@ func (a *aparatServiceImpl) DeleteAparat(ctx context.Context, idAparat string) (
 		return http.StatusInternalServerError, fmt.Errorf("gagal menghapus aparat: %v", err)
 	}
 
-	uploadDir := "./uploads/"
+	uploadDir := "uploads/aparat/"
 	if _, err := os.Stat(uploadDir); os.IsExist(err) {
 		os.Remove(filepath.Join(uploadDir, getAparat.Foto))
 	}
@@ -292,7 +292,7 @@ func (a *aparatServiceImpl) BulkDeleteAparat(ctx context.Context, idAparat []str
 	}
 
 	for _, aparat := range aparat {
-		uploadDir := "./uploads/"
+		uploadDir := "uploads/aparat/"
 		if _, err := os.Stat(uploadDir); os.IsExist(err) {
 			os.Remove(filepath.Join(uploadDir, aparat.Foto))
 		}

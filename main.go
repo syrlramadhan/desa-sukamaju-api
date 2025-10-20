@@ -65,7 +65,11 @@ func main() {
 	router.POST("/api/v1/berita", beritaController.CreateBerita)
 	router.GET("/api/v1/berita", beritaController.GetAllBerita)
 	router.GET("/api/v1/berita/:id_berita", beritaController.GetBeritaById)
-	router.POST("/api/v1/berita/photo", beritaController.CreatePhoto)
+	router.PUT("/api/v1/berita/:id_berita", beritaController.UpdateBerita)
+	router.DELETE("/api/v1/berita/:id_berita", beritaController.DeleteBerita)
+	router.POST("/api/v1/photo/berita", beritaController.CreatePhoto)
+	router.DELETE("/api/v1/photo/berita/:filename", beritaController.DeletePhotoByFilename)
+	router.DELETE("/api/v1/bulk/photo/berita", beritaController.BulkDeletePhoto)
 
 	// Serve static files from uploads directory
 	router.ServeFiles("/uploads/*filepath", http.Dir("uploads"))

@@ -22,8 +22,10 @@ type BeritaService interface {
 	CreatePhoto(ctx context.Context, r *http.Request, photoReq dto.GaleriRequest) (int, error)
 	GetAllBerita(ctx context.Context) ([]dto.BeritaResponse, int, error)
 	GetBeritaById(ctx context.Context, idBerita string) (dto.BeritaResponse, int, error)
-	UpdateBerita(ctx context.Context, beritaReq dto.BeritaRequest) (int, error)
+	UpdateBerita(ctx context.Context, idBerita string, beritaReq dto.BeritaRequest) (int, error)
 	DeleteBerita(ctx context.Context, idBerita string) (int, error)
+	DeletePhotoByFilename(ctx context.Context, filename string) (int, error)
+	BulkDeletePhoto(ctx context.Context, filenames []string) (int, error)
 }
 
 type beritaServiceImpl struct {
@@ -40,6 +42,7 @@ func NewBeritaService(repo repositories.BeritaRepository, db *sql.DB) BeritaServ
 
 // CreateBerita implements BeritaService.
 func (b *beritaServiceImpl) CreateBerita(ctx context.Context, r *http.Request, beritaReq dto.BeritaRequest) (int, error) {
+	// ... (kode sebelumnya tetap sama)
 	// Parse multipart form dengan buffer yang lebih besar (100MB)
 	err := r.ParseMultipartForm(100 << 20) // 100MB
 	if err != nil {
@@ -106,7 +109,7 @@ func (b *beritaServiceImpl) CreateBerita(ctx context.Context, r *http.Request, b
 
 		// Generate nama file unik
 		timestamp := time.Now().Unix()
-		filename := fmt.Sprintf("berita_%s_%d_%d.jpg", beritaId, timestamp, i+1)
+		filename := fmt.Sprintf("berita_%s_%d_%d%s", beritaId, timestamp, i+1, ext)
 
 		// Buka file yang diupload
 		file, err := fileHeader.Open()
@@ -181,6 +184,7 @@ func (b *beritaServiceImpl) CreateBerita(ctx context.Context, r *http.Request, b
 
 // CreatePhoto implements BeritaService.
 func (b *beritaServiceImpl) CreatePhoto(ctx context.Context, r *http.Request, photoReq dto.GaleriRequest) (int, error) {
+	// ... (kode sebelumnya tetap sama)
 	// Parse multipart form dengan buffer yang lebih besar (100MB)
 	err := r.ParseMultipartForm(100 << 20) // 100MB
 	if err != nil {
@@ -319,7 +323,106 @@ func (b *beritaServiceImpl) CreatePhoto(ctx context.Context, r *http.Request, ph
 
 // DeleteBerita implements BeritaService.
 func (b *beritaServiceImpl) DeleteBerita(ctx context.Context, idBerita string) (int, error) {
-	panic("unimplemented")
+	// Validasi input
+	if idBerita == "" {
+		return http.StatusBadRequest, fmt.Errorf("id berita tidak boleh kosong")
+	}
+
+	tx, err := b.DB.Begin()
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("gagal memulai transaksi: %v", err)
+	}
+	defer tx.Rollback()
+
+	// Ambil data foto berita untuk menghapus file
+	photos, err := b.repo.GetPhotosByBeritaId(ctx, tx, idBerita)
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("gagal mendapatkan data foto: %v", err)
+	}
+
+	// Hapus berita dari database (termasuk galeri karena foreign key constraint)
+	err = b.repo.DeleteBerita(ctx, tx, idBerita)
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("gagal menghapus berita: %v", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("gagal mengkomit transaksi: %v", err)
+	}
+
+	// Hapus file gambar dari storage setelah commit berhasil
+	uploadDir := "uploads/berita"
+	for _, photo := range photos {
+		filePath := filepath.Join(uploadDir, photo.Gambar)
+		if _, err := os.Stat(filePath); err == nil {
+			os.Remove(filePath)
+		}
+	}
+
+	return http.StatusOK, nil
+}
+
+// DeletePhotoByFilename implements BeritaService.
+func (b *beritaServiceImpl) DeletePhotoByFilename(ctx context.Context, filename string) (int, error) {
+	tx, err := b.DB.Begin()
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("gagal memulai transaksi: %v", err)
+	}
+	defer tx.Rollback()
+
+	// Hapus foto dari database
+	err = b.repo.DeletePhotoByFilename(ctx, tx, filename)
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("gagal menghapus foto dari database: %v", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("gagal mengkomit transaksi: %v", err)
+	}
+
+	// Hapus file dari storage setelah commit berhasil
+	uploadDir := "uploads/berita"
+	filePath := filepath.Join(uploadDir, filename)
+	if _, err := os.Stat(filePath); err == nil {
+		os.Remove(filePath)
+	}
+
+	return http.StatusOK, nil
+}
+
+// BulkDeletePhoto implements BeritaService.
+func (b *beritaServiceImpl) BulkDeletePhoto(ctx context.Context, filenames []string) (int, error) {
+	// Validasi input
+	if len(filenames) == 0 {
+		return http.StatusBadRequest, fmt.Errorf("daftar nama file tidak boleh kosong")
+	}
+
+	tx, err := b.DB.Begin()
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("gagal memulai transaksi: %v", err)
+	}
+	defer tx.Rollback()
+
+	// Hapus multiple foto dari database
+	err = b.repo.BulkDeletePhoto(ctx, tx, filenames)
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("gagal menghapus foto dari database: %v", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("gagal mengkomit transaksi: %v", err)
+	}
+
+	// Hapus file dari storage setelah commit berhasil
+	uploadDir := "uploads/berita"
+	for _, filename := range filenames {
+		filePath := filepath.Join(uploadDir, filename)
+		if _, err := os.Stat(filePath); err == nil {
+			os.Remove(filePath)
+		}
+	}
+
+	return http.StatusOK, nil
 }
 
 // GetAllBerita implements BeritaService.
@@ -418,6 +521,56 @@ func (b *beritaServiceImpl) GetBeritaById(ctx context.Context, idBerita string) 
 }
 
 // UpdateBerita implements BeritaService.
-func (b *beritaServiceImpl) UpdateBerita(ctx context.Context, beritaReq dto.BeritaRequest) (int, error) {
-	panic("unimplemented")
+func (b *beritaServiceImpl) UpdateBerita(ctx context.Context, idBerita string, beritaReq dto.BeritaRequest) (int, error) {
+	// Validasi input
+	if idBerita == "" {
+		return http.StatusBadRequest, fmt.Errorf("id berita tidak boleh kosong")
+	}
+	if beritaReq.JudulBerita == "" {
+		return http.StatusBadRequest, fmt.Errorf("judul berita tidak boleh kosong")
+	}
+	if beritaReq.Kategori == "" {
+		return http.StatusBadRequest, fmt.Errorf("kategori tidak boleh kosong")
+	}
+	if beritaReq.TanggalPelaksanaan == "" {
+		return http.StatusBadRequest, fmt.Errorf("tanggal pelaksanaan tidak boleh kosong")
+	}
+	if beritaReq.Deskripsi == "" {
+		return http.StatusBadRequest, fmt.Errorf("deskripsi tidak boleh kosong")
+	}
+
+	tx, err := b.DB.Begin()
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("gagal memulai transaksi: %v", err)
+	}
+	defer tx.Rollback()
+
+	// Validasi apakah berita exists
+	_, err = b.repo.GetBeritaById(ctx, tx, idBerita)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return http.StatusNotFound, fmt.Errorf("berita dengan ID %s tidak ditemukan", idBerita)
+		}
+		return http.StatusInternalServerError, fmt.Errorf("gagal mendapatkan berita: %v", err)
+	}
+
+	// Update data berita
+	berita := models.Berita{
+		IdBerita:           idBerita,
+		JudulBerita:        beritaReq.JudulBerita,
+		Kategori:           beritaReq.Kategori,
+		TanggalPelaksanaan: beritaReq.TanggalPelaksanaan,
+		Deskripsi:          beritaReq.Deskripsi,
+	}
+
+	err = b.repo.UpdateBerita(ctx, tx, berita)
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("gagal mengupdate berita: %v", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("gagal mengkomit transaksi: %v", err)
+	}
+
+	return http.StatusOK, nil
 }

@@ -3,6 +3,7 @@ package repositories
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	"github.com/syrlramadhan/desa-sukamaju-api/models"
 )
@@ -14,6 +15,10 @@ type BeritaRepository interface {
 	GetBeritaById(ctx context.Context, tx *sql.Tx, idBerita string) (models.Berita, error)
 	UpdateBerita(ctx context.Context, tx *sql.Tx, berita models.Berita) error
 	DeleteBerita(ctx context.Context, tx *sql.Tx, idBerita string) error
+	DeletePhotoByFilename(ctx context.Context, tx *sql.Tx, filename string) error
+	BulkDeletePhoto(ctx context.Context, tx *sql.Tx, filenames []string) error
+	GetPhotosByBeritaId(ctx context.Context, tx *sql.Tx, idBerita string) ([]models.Galeri, error)
+	DeletePhotosByBeritaId(ctx context.Context, tx *sql.Tx, idBerita string) error
 }
 
 type beritaRepositoryImpl struct{}
@@ -54,7 +59,79 @@ func (b *beritaRepositoryImpl) AddPhoto(ctx context.Context, tx *sql.Tx, photo m
 
 // DeleteBerita implements BeritaRepository.
 func (b *beritaRepositoryImpl) DeleteBerita(ctx context.Context, tx *sql.Tx, idBerita string) error {
-	panic("unimplemented")
+	// Hapus galeri terlebih dahulu (foreign key constraint)
+	queryDeleteGaleri := "DELETE FROM galeri WHERE id_berita = ?"
+	_, err := tx.ExecContext(ctx, queryDeleteGaleri, idBerita)
+	if err != nil {
+		return fmt.Errorf("gagal menghapus galeri: %v", err)
+	}
+
+	// Hapus berita
+	queryDeleteBerita := "DELETE FROM berita WHERE id_berita = ?"
+	_, err = tx.ExecContext(ctx, queryDeleteBerita, idBerita)
+	if err != nil {
+		return fmt.Errorf("gagal menghapus berita: %v", err)
+	}
+
+	return nil
+}
+
+// DeletePhotoByFilename implements BeritaRepository.
+func (b *beritaRepositoryImpl) DeletePhotoByFilename(ctx context.Context, tx *sql.Tx, filename string) error {
+	query := "DELETE FROM galeri WHERE gambar = ?"
+	_, err := tx.ExecContext(ctx, query, filename)
+	return err
+}
+
+// BulkDeletePhoto implements BeritaRepository.
+func (b *beritaRepositoryImpl) BulkDeletePhoto(ctx context.Context, tx *sql.Tx, filenames []string) error {
+	if len(filenames) == 0 {
+		return nil
+	}
+
+	// Buat placeholder untuk query IN
+	placeholders := ""
+	args := make([]interface{}, len(filenames))
+	for i, filename := range filenames {
+		if i > 0 {
+			placeholders += ","
+		}
+		placeholders += "?"
+		args[i] = filename
+	}
+
+	query := fmt.Sprintf("DELETE FROM galeri WHERE gambar IN (%s)", placeholders)
+	_, err := tx.ExecContext(ctx, query, args...)
+	return err
+}
+
+// GetPhotosByBeritaId implements BeritaRepository.
+func (b *beritaRepositoryImpl) GetPhotosByBeritaId(ctx context.Context, tx *sql.Tx, idBerita string) ([]models.Galeri, error) {
+	query := "SELECT id_galeri, id_berita, gambar FROM galeri WHERE id_berita = ?"
+	rows, err := tx.QueryContext(ctx, query, idBerita)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var photos []models.Galeri
+	for rows.Next() {
+		var photo models.Galeri
+		err := rows.Scan(&photo.IdGaleri, &photo.IdBerita, &photo.Gambar)
+		if err != nil {
+			return nil, err
+		}
+		photos = append(photos, photo)
+	}
+
+	return photos, nil
+}
+
+// DeletePhotosByBeritaId implements BeritaRepository.
+func (b *beritaRepositoryImpl) DeletePhotosByBeritaId(ctx context.Context, tx *sql.Tx, idBerita string) error {
+	query := "DELETE FROM galeri WHERE id_berita = ?"
+	_, err := tx.ExecContext(ctx, query, idBerita)
+	return err
 }
 
 // GetAllBerita implements BeritaRepository.
@@ -207,5 +284,7 @@ func (b *beritaRepositoryImpl) GetBeritaById(ctx context.Context, tx *sql.Tx, id
 
 // UpdateBerita implements BeritaRepository.
 func (b *beritaRepositoryImpl) UpdateBerita(ctx context.Context, tx *sql.Tx, berita models.Berita) error {
-	panic("unimplemented")
+	query := "UPDATE berita SET judul_berita = ?, kategori = ?, tanggal_pelaksanaan = ?, deskripsi = ? WHERE id_berita = ?"
+	_, err := tx.ExecContext(ctx, query, berita.JudulBerita, berita.Kategori, berita.TanggalPelaksanaan, berita.Deskripsi, berita.IdBerita)
+	return err
 }
