@@ -71,6 +71,13 @@ func main() {
 	router.DELETE("/api/v1/photo/berita/:filename", beritaController.DeletePhotoByFilename)
 	router.DELETE("/api/v1/bulk/photo/berita", beritaController.BulkDeletePhoto)
 
+	pendudukRepo := repositories.NewPendudukRepository()
+	pendudukService := services.NewPendudukService(pendudukRepo, db)
+	pendudukController := controllers.NewPendudukController(pendudukService)
+
+	router.GET("/api/v1/penduduk", pendudukController.GetPenduduk)
+	router.PUT("/api/v1/penduduk", pendudukController.UpdatePenduduk)
+
 	// Serve static files from uploads directory
 	router.ServeFiles("/uploads/*filepath", http.Dir("uploads"))
 
